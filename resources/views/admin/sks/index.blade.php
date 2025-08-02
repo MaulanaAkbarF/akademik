@@ -1,4 +1,4 @@
-{{-- resources/views/admin/sks/index.blade.php --}}
+{{-- resources/views/admin/sks/index.blade.php - ENHANCED DEBUG VERSION --}}
 @extends('layouts.app')
 
 @section('content')
@@ -19,6 +19,19 @@
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     @endif
+
+                    @if(session('error'))
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="fas fa-exclamation-circle"></i> {{ session('error') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    @endif
+
+                    <!-- Debug Info -->
+                    <div id="debug-info" class="alert alert-info" style="display: none;">
+                        <strong>Debug Info:</strong>
+                        <div id="debug-content"></div>
+                    </div>
 
                     @if($transactions->count() > 0)
                         <!-- Summary Cards -->
@@ -117,13 +130,39 @@
                                                 @if($transaction->isPending())
                                                     <div class="btn-group" role="group">
                                                         <button type="button" class="btn btn-sm btn-success" 
-                                                                onclick="updateStatus({{ $transaction->id }}, 'approved')">
+                                                                onclick="updateStatus({{ $transaction->id }}, 'approved')"
+                                                                data-transaction-id="{{ $transaction->id }}"
+                                                                data-status="approved">
                                                             <i class="fas fa-check"></i>
                                                         </button>
                                                         <button type="button" class="btn btn-sm btn-danger"
-                                                                onclick="updateStatus({{ $transaction->id }}, 'rejected')">
+                                                                onclick="updateStatus({{ $transaction->id }}, 'rejected')"
+                                                                data-transaction-id="{{ $transaction->id }}"
+                                                                data-status="rejected">
                                                             <i class="fas fa-times"></i>
                                                         </button>
+                                                        
+                                                        <!-- FALLBACK: Direct form submission -->
+                                                        <div class="d-none">
+                                                            <form method="POST" action="{{ route('admin.sks.update-status', $transaction->id) }}" class="d-inline">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <input type="hidden" name="status" value="approved">
+                                                                <button type="submit" class="btn btn-sm btn-outline-success" 
+                                                                        onclick="return confirm('Setujui transaksi ini?')">
+                                                                    Setujui
+                                                                </button>
+                                                            </form>
+                                                            <form method="POST" action="{{ route('admin.sks.update-status', $transaction->id) }}" class="d-inline">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <input type="hidden" name="status" value="rejected">
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                                        onclick="return confirm('Tolak transaksi ini?')">
+                                                                    Tolak
+                                                                </button>
+                                                            </form>
+                                                        </div>
                                                     </div>
                                                 @else
                                                     <span class="text-muted">-</span>
@@ -150,12 +189,12 @@
 </div>
 
 <!-- Modal for Status Update -->
-<div class="modal fade" id="statusModal" tabindex="-1">
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Konfirmasi Transaksi</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="statusModalLabel">Konfirmasi Transaksi</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="statusForm" method="POST">
                 @csrf
@@ -183,15 +222,170 @@
 </div>
 
 <script>
-function updateStatus(transactionId, status) {
-    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
-    const form = document.getElementById('statusForm');
-    const statusSelect = document.getElementById('statusSelect');
+// Debug function to check what's available
+function checkDependencies() {
+    const debug = document.getElementById('debug-content');
+    let debugInfo = [];
     
-    form.action = `/admin/sks-transactions/${transactionId}/status`;
-    statusSelect.value = status;
+    debugInfo.push('jQuery available: ' + (typeof $ !== 'undefined' ? 'Yes' : 'No'));
+    debugInfo.push('Bootstrap available: ' + (typeof bootstrap !== 'undefined' ? 'Yes' : 'No'));
+    debugInfo.push('Modal element exists: ' + (document.getElementById('statusModal') ? 'Yes' : 'No'));
+    debugInfo.push('Form element exists: ' + (document.getElementById('statusForm') ? 'Yes' : 'No'));
     
-    modal.show();
+    if (debug) {
+        debug.innerHTML = debugInfo.join('<br>');
+        document.getElementById('debug-info').style.display = 'block';
+    }
+    
+    return debugInfo;
 }
+
+// Enhanced updateStatus function with multiple fallbacks
+function updateStatus(transactionId, status) {
+    console.log('=== UPDATE STATUS CALLED ===');
+    console.log('Transaction ID:', transactionId);
+    console.log('Status:', status);
+    
+    // Check dependencies first
+    const debugInfo = checkDependencies();
+    console.log('Debug info:', debugInfo);
+    
+    try {
+        // Method 1: Try Bootstrap 5 Modal
+        if (typeof bootstrap !== 'undefined') {
+            console.log('Trying Bootstrap 5 Modal...');
+            const modalElement = document.getElementById('statusModal');
+            const form = document.getElementById('statusForm');
+            const statusSelect = document.getElementById('statusSelect');
+            
+            if (modalElement && form && statusSelect) {
+                const modal = new bootstrap.Modal(modalElement);
+                form.action = `/admin/sks-transactions/${transactionId}/status`;
+                statusSelect.value = status;
+                
+                console.log('Form action set to:', form.action);
+                modal.show();
+                return;
+            } else {
+                throw new Error('Modal elements not found');
+            }
+        }
+        
+        // Method 2: Try jQuery + Bootstrap 4
+        else if (typeof $ !== 'undefined' && $.fn.modal) {
+            console.log('Trying jQuery + Bootstrap 4 Modal...');
+            const form = $('#statusForm');
+            const statusSelect = $('#statusSelect');
+            
+            form.attr('action', `/admin/sks-transactions/${transactionId}/status`);
+            statusSelect.val(status);
+            
+            $('#statusModal').modal('show');
+            return;
+        }
+        
+        // Method 3: Fallback to confirm dialog
+        else {
+            console.log('Using fallback confirm dialog...');
+            const confirmMessage = status === 'approved' ? 
+                'Apakah Anda yakin ingin menyetujui transaksi ini?' : 
+                'Apakah Anda yakin ingin menolak transaksi ini?';
+            
+            if (confirm(confirmMessage)) {
+                // Create and submit form programmatically
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/admin/sks-transactions/${transactionId}/status`;
+                
+                // Add CSRF token
+                const csrfToken = document.querySelector('meta[name="csrf-token"]');
+                if (csrfToken) {
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = '_token';
+                    csrfInput.value = csrfToken.getAttribute('content');
+                    form.appendChild(csrfInput);
+                }
+                
+                // Add method field
+                const methodInput = document.createElement('input');
+                methodInput.type = 'hidden';
+                methodInput.name = '_method';
+                methodInput.value = 'PATCH';
+                form.appendChild(methodInput);
+                
+                // Add status field
+                const statusInput = document.createElement('input');
+                statusInput.type = 'hidden';
+                statusInput.name = 'status';
+                statusInput.value = status;
+                form.appendChild(statusInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+                return;
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error in updateStatus:', error);
+        
+        // Last resort: redirect to fallback URL
+        const confirmMessage = 'Terjadi kesalahan dengan modal. Lanjutkan dengan cara sederhana?\n\n' +
+            (status === 'approved' ? 'Setujui transaksi ini?' : 'Tolak transaksi ini?');
+        
+        if (confirm(confirmMessage)) {
+            window.location.href = `/admin/sks-transactions/${transactionId}/status?status=${status}&_method=PATCH&_token=${document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')}`;
+        }
+    }
+}
+
+// Alternative click handlers using event delegation
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded');
+    checkDependencies();
+    
+    // Event delegation for dynamically added buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.matches('[data-transaction-id]') || e.target.closest('[data-transaction-id]')) {
+            const button = e.target.matches('[data-transaction-id]') ? e.target : e.target.closest('[data-transaction-id]');
+            const transactionId = button.getAttribute('data-transaction-id');
+            const status = button.getAttribute('data-status');
+            
+            if (transactionId && status) {
+                console.log('Event delegation triggered:', transactionId, status);
+                updateStatus(transactionId, status);
+            }
+        }
+    });
+    
+    // Form submission handler
+    const statusForm = document.getElementById('statusForm');
+    if (statusForm) {
+        statusForm.addEventListener('submit', function(e) {
+            console.log('Form submitted to:', this.action);
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Memproses...';
+                submitBtn.disabled = true;
+                
+                // Re-enable after timeout as fallback
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 5000);
+            }
+        });
+    }
+});
 </script>
+
+{{-- Add this to check if CSRF token exists --}}
+@if(!session()->has('_token'))
+    <script>
+        console.warn('CSRF token not found in session');
+    </script>
+@endif
 @endsection

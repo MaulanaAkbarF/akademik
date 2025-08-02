@@ -1,5 +1,5 @@
 <?php
-// routes/web.php - Updated with SKS features
+// routes/web.php - Fixed route configuration
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminController;
@@ -18,9 +18,9 @@ Auth::routes();
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     
-    // SKS Transaction Management
+    // SKS Transaction Management - FIXED: Changed parameter name to match controller
     Route::get('/admin/sks-transactions', [SksTransactionController::class, 'indexAdmin'])->name('admin.sks.index');
-    Route::patch('/admin/sks-transactions/{sksTransaction}/status', [SksTransactionController::class, 'updateStatus'])->name('admin.sks.update-status');
+    Route::patch('/admin/sks-transactions/{transaction}/status', [SksTransactionController::class, 'updateStatus'])->name('admin.sks.update-status');
 });
 
 Route::middleware(['auth', 'role:dosen'])->group(function () {
